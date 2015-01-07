@@ -201,19 +201,31 @@ class Purl
             }
         }
         
+        // Support basic authentication
+        if (isset($this->_options[CURLOPT_USERPWD])) {
+            $this->_headers[] = 'Authorization: Basic ' . base64_encode($this->_options[CURLOPT_USERPWD]);
+        }
+
         // add cookie header
         if (isset($this->_options[CURLOPT_COOKIE])) {
-            $this->_headers['Cookie'] = $this->_options[CURLOPT_COOKIE];            
+            $this->_headers[] = 'Cookie: ' . $this->_options[CURLOPT_COOKIE];
         }
-                
+
         if ($this->_headers) {
-            foreach ($this->_headers as $value) {
+            foreach($this->_headers as $value) {
+                // status code 417 Expect: 100 continue
+                if (0 === strpos($value, 'Expect:')) {
+                    continue;
+                }
                 $headers .= $value . "\r\n";
             }
+            if (1024 <= strlen($headers)) {
+                $headers .= 'Except: 100-continue'."\r\n";
+            }
         }
-
+        
         if (!preg_match('/Content-type/', $headers)) $headers .= "Content-type: " . "application/x-www-form-urlencoded"."\r\n";
-
+        
         return $this->_call($query, $this->_info['request_header'] = $headers);
     }
     
@@ -226,7 +238,8 @@ class Purl
      * @return boolean|string
      */
     protected function _call($query, $headers)
-    {        
+    { 
+
         $options =
             array('http'=>
               array(
@@ -274,7 +287,8 @@ class Purl
             $this->_result = file_get_contents($this->_url, false, $context);
         }
         
-        $this->_info['http_code'] = explode(' ', $http_response_header[0])[1];
+        $httpCode = explode(' ', $http_response_header[0])[1];
+        $this->_info['http_code'] = (int)$httpCode;
                 
         error_reporting($reporting);
                 
